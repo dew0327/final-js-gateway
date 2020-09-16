@@ -303,7 +303,7 @@ metadata:
     targetCPUUtilizationPercentage: 10  # cpu사용율 10프로 초과 시 
 ```    
 * 부하테스트(Siege)를 활용한 부하 적용 후 서킷브레이킹 / 오토스케일 내역을 확인한다.
-![HPA, Circuit Breaker  SEIGE_STATUS](https://user-images.githubusercontent.com/54210936/93168766-9ced3800-f75e-11ea-9d6b-fdf37591b97a.jpg)
+![HPA, Circuit Breaker  SEIGE_STATUS](https://user-images.githubusercontent.com/68719144/93344893-2c810c80-f86d-11ea-9c42-9672aebe8eb2.jpg)
 ![HPA  TO-BE POD STATUS](https://user-images.githubusercontent.com/68719144/93342977-ea56cb80-f86a-11ea-8434-718734741fcc.jpg)
 
 </br>
