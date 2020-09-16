@@ -291,7 +291,7 @@ CPU사용률 10% 초과 시 replica를 5개까지 확장해준다. 상용에서�
 apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
 metadata:
-  name: skcchpa-order
+  name: skcchpa-point
   namespace: teamc
   spec:
     scaleTargetRef:
