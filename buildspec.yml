@@ -77,7 +77,7 @@ phases:
                   app: $_PROJECT_NAME
               spec:
                 containers:
-                  - name: $_PROJECT_NAME
+                  - name: $IMAGE_REPO_NAME
                     image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$_PROJECT_NAME:$CODEBUILD_RESOLVED_SOURCE_VERSION
                     ports:
                       - containerPort: 8080
