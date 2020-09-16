@@ -44,10 +44,10 @@ phases:
           apiVersion: v1
           kind: Service
           metadata:
-            name: $_PROJECT_NAME
+            name: $IMAGE_REPO_NAME
             namespace: teamc
             labels:
-              app: $_PROJECT_NAME
+              app: $IMAGE_REPO_NAME
           spec:
             ports:
               - port: 8080
@@ -62,19 +62,19 @@ phases:
           apiVersion: apps/v1
           kind: Deployment
           metadata:
-            name: $_PROJECT_NAME
+            name: $IMAGE_REPO_NAME
             namespace: teamc
             labels:
-              app: $_PROJECT_NAME
+              app: $IMAGE_REPO_NAME
           spec:
             replicas: 1
             selector:
               matchLabels:
-                app: $_PROJECT_NAME
+                app: $IMAGE_REPO_NAME
             template:
               metadata:
                 labels:
-                  app: $_PROJECT_NAME
+                  app: $IMAGE_REPO_NAME
               spec:
                 containers:
                   - name: $IMAGE_REPO_NAME
