@@ -53,7 +53,7 @@ phases:
               - port: 8080
                 targetPort: 8080
             selector:
-              app: $_PROJECT_NAME
+              app: $IMAGE_REPO_NAME
             type:
               LoadBalancer
           EOF
