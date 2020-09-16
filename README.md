@@ -1,6 +1,8 @@
 # Intensive Lv2. TeamC
 
-음식을 주문하고 요리하여 배달하는 현황을 확인 할 수 있는 CNA의 개발
+음식을 주문하고 요리하여 배달하는 현황을 확인 할 수 있는 CNA의 개발  
+개인과제 추가 내용  
+ : 주문 완료 시 포인트를 적립, 주문 취소 시 포인트를 취소
 
 # Table of contents
 
@@ -46,8 +48,8 @@
 # 분석/설계
 
 ## Event Storming 결과
-* MSAEz 로 모델링한 이벤트스토밍 결과 : http://www.msaez.io/#/storming/t5Z5EXdDP0UOZDvGzeNH61hF8qG3/mine/52e31337a76ddeacc1d288ea11e24158/-MH4jm58lJNE_9tgT82F
-![EventStorming_Restaurant](https://user-images.githubusercontent.com/54210936/93179266-66201d80-f770-11ea-9530-aae4dfef7e4d.png)
+* MSAEz 로 모델링한 이벤트스토밍 결과 : http://www.msaez.io/#/storming/6FSFbn3irgYzkgbhPPVBMcEg2Un1/mine/4742e06e8ca55cd185a89fba17420008/-MHG2NGoPl6nOPcnXPQ-
+![eventstorming](https://user-images.githubusercontent.com/68719144/93326489-d6539f80-f853-11ea-836e-a3eb99b91d2b.jpg)  
 
 ### 이벤트 도출
 1. 주문됨
@@ -55,11 +57,13 @@
 1. 요리재고체크됨
 1. 요리완료
 1. 배달
+1. 포인트 적립됨
+1. 포인트 적립 취소됨
 
 
 ### 어그리게잇으로 묶기
 
-  * 고객의 주문(Order), 식당의 요리(Cook), 배달(Delivery)은 그와 연결된 command와 event 들에 의하여 트랙잭션이 유지되어야 하는 단위로 묶어 줌.
+  * 고객의 주문(Order), 식당의 요리(Cook), 배달(Delivery), 포인트(Point) 은 그와 연결된 command와 event 들에 의하여 트랙잭션이 유지되어야 하는 단위로 묶어 줌.
 
 ### Policy 부착 
 
@@ -75,6 +79,8 @@
  * 주문이 취소되면, 요리취소 내용을 고객에게 전달한다.(ok)
  * 고객이 주문 시 재고량을 체크한다.(ok)
  * 재고가 없을 경우 주문이 취소된다.(ok)
+ * 주문이 완료되면 포인트를 적립한다. (ok)
+ * 주문이 취쇠되면 포인트 적립을 취소한다. (ok)
  * 고객은 Mypage를 통해, 주문과 요리, 배달의 전체 상황을 조회할수 있다.(ok)
 
 </br>
@@ -89,37 +95,35 @@
 
 ## DDD 의 적용
 
-- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 주문- Order 마이크로서비스).
+- 각 서비스내에 도출된 핵심 Aggregate Root 객체를 Entity 로 선언하였다: (예시는 포인트- Point 마이크로서비스).
 
 ```
-package myProject_LSP;
-
-import javax.persistence.*;
 import org.springframework.beans.BeanUtils;
-import java.util.List;
+import javax.persistence.*;
 
 @Entity
-@Table(name="Order_table")
-public class Order {
+@Table(name="Point_table")
+public class Point {
 
+    //수정
+    private static int pointQty=10;
+
+    private boolean pointFlowChk=true;
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private Long id;
-    private Integer restaurantId;
-    private Integer restaurantMenuId;
-    private Integer customerId;
-    private Integer qty;
-    private Long modifiedDate;
+    private Long orderId;
     private String status;
+    private Long sendDate;
+    private String pointKind;
     
     ....
 }
 ```
 - JPA를 활용한 Repository Pattern을 적용하여 이후 데이터소스 유형이 변경되어도 별도의 처리 없이 사용 가능한 Spring Data REST 의 RestRepository 를 적용하였다
 ```
-package myProject_LSP;
 import org.springframework.data.repository.PagingAndSortingRepository;
-public interface OrderRepository extends PagingAndSortingRepository<Order, Long>{
+public interface PointRepository extends PagingAndSortingRepository<Order, Long>{
 
 }
 ```
