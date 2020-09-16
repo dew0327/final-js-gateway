@@ -40,7 +40,7 @@
 ## 비기능적 요구사항
 1. 장애격리
     1. 주문시스템이 과중되면 사용자를 잠시동안 받지 않고 잠시후에 주문하도록 유도한다.
-    1. 주문 시스템이 죽을 경우 재기동 될 수 있도록 한다.
+    1. 주문, 포인트, 요리, 배달, 마이페이지 시스템이 죽을 경우 재기동 될 수 있도록 한다.
 1. 운영
     1. 마이크로서비스별로 로그를 한 곳에 모아 볼 수 있도록 시스템을 구성한다.
     1. 마이크로서비스의 개발 및 빌드 배포가 한번에 이루어질 수 있도록 시스템을 구성한다.
@@ -133,68 +133,62 @@ public interface PointRepository extends PagingAndSortingRepository<Order, Long>
 ```
 </br>
 
-## 동기식 호출과 Fallback 처리
+## 동기식 호출
 
 분석단계에서의 조건 중 하나로 주문->취소 간의 호출은 트랜잭션으로 처리. 호출 프로토콜은 Rest Repository의 REST 서비스를 FeignClient 를 이용하여 호출.
-- 요리(cook) 서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
+- 포인트(point) 서비스를 호출하기 위하여 Stub과 (FeignClient) 를 이용하여 Service 대행 인터페이스 (Proxy) 를 구현 
 
 ```
-@FeignClient(name="cook", url="${api.url.cook}")
-public interface CancellationService {
+@FeignClient(name="point", url="${api.url.point}")
+public interface PointService {
 
-  @RequestMapping(method= RequestMethod.GET, path="/cancellations")
-  public void cancel(@RequestBody Cancellation cancellation);
+    @RequestMapping(method= RequestMethod.POST, path="/points")
+    public void pointSend(@RequestBody Point point);
 
 }
 ```
 
-- 주문이 취소 될 경우 Cancellation 현황에 취소 내역을 접수한다.
-```
-@PrePersist
-public void onPrePersist(){
-   CookCancelled cookCancelled = new CookCancelled();
-   BeanUtils.copyProperties(this, cookCancelled);
-   cookCancelled.setStatus("COOK : ORDER CANCELED");
-   cookCancelled.publishAfterCommit();
-```
 
 </br>
 
 ## 비동기식 호출과 Saga Pattern
 
-주문 접수 및 배달 접수, 재고부족으로 인한 주문 취소는 비동기식으로 처리하여 시스템 상황에 따라 접수 및 취소가 블로킹 되지 않도록 처리 한다. 
-요리 단계 접수시에는 재고를 체크하고 재고가 부족할 경우 주문단계로 비동기식 요리 불가 발행(publish). 
+주문 접수 및 포인트 적립, 포인트 취소는 비동기식으로 처리하며 시스템 상황에 따라 접수 및 취소가 블로킹 되지 않도록 처리 한다. 
+포인트 적립이 완료되었을 경우 주문단계로 비동기식 포인트 적립 완료 발생(publish)
  
 ```
-@Entity
-@Table(name="Cook_table")
-public class Cook {
-    private boolean flowchk = true;
-    ....
+
     @PostPersist
     public void onPostPersist(){
-        if(flowchk) {   // 요리를 할 수 있는 재고가 있을 때 요리를 시작한다
-            Cooked cooked = new Cooked();
-            BeanUtils.copyProperties(this, cooked);
-            this.setStatus("COOK : ORDER RECEIPT");
-            this.qty--;
-            cooked.publishAfterCommit();
-        }else{
-            CookQtyChecked cookQtyChecked = new CookQtyChecked();
-            BeanUtils.copyProperties(this, cookQtyChecked);
-            cookQtyChecked.publishAfterCommit();
+        System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 26 ");
+        System.out.println(this.getStatus());
+        if("Point : Point SENDED".equals(this.getStatus())){
+            //ORDER -> Point SEND 경우
+            PointSended pointSended = new PointSended();
+            BeanUtils.copyProperties(this, pointSended);
+            pointSended.publishAfterCommit();
         }
     }
 
     @PrePersist
     public void onPrePersist(){
-        // 요리를 할 수 있는 재고가 없을 때 요리를 시작한다
-        if(this.getQty() <= 0) {
-            this.setStatus("COOK : QTY OVER");
-            flowchk = false;
+
+        System.out.println(this.getStatus() + "++++++++++++++++++++++++++++++++");
+
+        if("ORDER : point SEND".equals(this.getStatus())){
+            this.setPointKind("100 point!!");
+            this.setStatus("Point : Point SENDED");
+            this.setSendDate(System.currentTimeMillis());
+        }else {
+            this.setStatus("Point : Point SEND CANCELLED");
+            //ORDER -> point CANCEL 경우
+
+            System.out.println("47 *****************************************");
+            PointSendCancelled pointSendCancelled = new PointSendCancelled();
+            BeanUtils.copyProperties(this, pointSendCancelled);
+            pointSendCancelled.publishAfterCommit();
         }
     }
-}
 ```
 
 </br>
@@ -225,6 +219,10 @@ spring:
           uri: http://mypage:8080
           predicates:
             - Path= /mypages/**
+        - id: point
+          uri: http://point:8080
+          predicates:
+            - Path= /points/**
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -235,18 +233,19 @@ spring:
             allowedHeaders:
               - "*"
             allowCredentials: true
-
 server:
   port: 8080
 ```
-![gateway_LoadBalancer (1)](https://user-images.githubusercontent.com/54210936/93281154-7aaef500-f806-11ea-997d-c70dc6a81056.png)
-![gateway_LoadBalancer_delivery (1)](https://user-images.githubusercontent.com/54210936/93281029-1e4bd580-f806-11ea-9b95-70b9985b6fde.png)
+![gateway](https://user-images.githubusercontent.com/68719144/93342384-3ead7b80-f86a-11ea-8277-96d41180f75e.jpg)
+![gateway-sample](https://user-images.githubusercontent.com/68719144/93342388-40773f00-f86a-11ea-9210-13e09eaadba6.jpg)
+
 
 </br>
 
 ## CQRS
-기존 코드에 영향도 없이 mypage 용 materialized view 구성한다. 고객은 주문 접수, 요리 상태, 배송현황 등을 한개의 페이지에서 확인 할 수 있게 됨.</br>
-![cqrs](https://user-images.githubusercontent.com/54210936/93281210-987c5a00-f806-11ea-835b-2cea09bf6466.png)
+기존 코드에 영향도 없이 mypage 용 materialized view 구성한다. 고객은 주문 접수, 요리 상태, 포인트 적립현황, 배송현황 등을 한개의 페이지에서 확인 할 수 있게 됨.</br>
+![mypage-sample](https://user-images.githubusercontent.com/68719144/93342738-a663c680-f86a-11ea-8a73-c5239d3cc303.jpg)
+
 
 </br>
 </br>
@@ -260,11 +259,12 @@ server:
   * Github에 Codebuild를 위한 yml 파일을 업로드하고, codebuild와 연동 함
   * 각 마이크로서비스의 build 스펙
   ```
-    https://github.com/dew0327/final-cna-order/blob/master/buildspec.yml
-    https://github.com/dew0327/final-cna-cook/blob/master/buildspec.yml
-    https://github.com/dew0327/final-cna-delivery/blob/master/buildspec.yml
-    https://github.com/dew0327/final-cna-gateway/blob/master/buildspec.yml
-    https://github.com/dew0327/final-cna-mypage/blob/master/buildspec.yml
+    https://github.com/dew0327/final-js-order/buildspec.yml
+    https://github.com/dew0327/final-js-cook//buildspec.yml
+    https://github.com/dew0327/final-js-delivery/buildspec.yml
+    https://github.com/dew0327/final-js-gateway/buildspec.yml
+    https://github.com/dew0327/final-js-mypage/buildspec.yml
+    https://github.com/dew0327/final-js-point/buildspec.yml
   ```
   
 </br>
@@ -274,7 +274,7 @@ server:
 * 서킷 브레이킹 :
 주문이 과도할 경우 CB 를 통하여 장애격리. 500 에러가 5번 발생하면 10분간 CB 처리하여 100% 접속 차단
 ```
-# AWS codebuild에 설정(https://github.com/dew0327/final-cna-order/blob/master/buildspec.yml)
+# AWS codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
  http:
    http1MaxPendingRequests: 1   # 연결을 기다리는 request 수를 1개로 제한 (Default 
    maxRequestsPerConnection: 1  # keep alive 기능 disable
@@ -297,14 +297,14 @@ metadata:
     scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: $_PROJECT_NAME                # order (주문) 서비스 HPA 설정
-    minReplicas: 3                      # 최소 3개
-    maxReplicas: 5                      # 최대 5개
+    name: $_PROJECT_NAME                # point (주문) 서비스 HPA 설정
+    minReplicas: 1                      # 최소 1개
+    maxReplicas: 3                      # 최대 3개
     targetCPUUtilizationPercentage: 10  # cpu사용율 10프로 초과 시 
 ```    
 * 부하테스트(Siege)를 활용한 부하 적용 후 서킷브레이킹 / 오토스케일 내역을 확인한다.
 ![HPA, Circuit Breaker  SEIGE_STATUS](https://user-images.githubusercontent.com/54210936/93168766-9ced3800-f75e-11ea-9d6b-fdf37591b97a.jpg)
-![HPA  TOBE_STATUS](https://user-images.githubusercontent.com/54210936/93167897-95c52a80-f75c-11ea-8f0e-51a94332141b.jpg)
+![HPA  TO-BE POD STATUS](https://user-images.githubusercontent.com/68719144/93342977-ea56cb80-f86a-11ea-8434-718734741fcc.jpg)
 
 </br>
 
@@ -315,9 +315,9 @@ metadata:
   
 
 ```
-# AWS codebuild에 설정(https://github.com/dew0327/final-cna-cook/blob/master/buildspec.yml)
+# AWS codebuild에 설정(https://github.com/dew0327/final-cna-point/blob/master/buildspec.yml)
   spec:
-    replicas: 5
+    replicas: 2
     minReadySeconds: 10   # 최소 대기 시간 10초
     strategy:
       type: RollingUpdate
@@ -327,14 +327,11 @@ metadata:
 
 ```
 
-- 새버전으로의 배포 시작(V3로 배포)
-![ZeroDownTime  console - pod change status](https://user-images.githubusercontent.com/54210936/93277970-4c2d1c00-f7fe-11ea-87ce-82cdd77e84ac.jpg)
+- 새버전으로의 배포 시작(V1로 배포)
+kubectl set image deployment/point -n teamc point=271153858532.dkr.ecr.ap-northeast-1.amazonaws.com/admin15-point:v1
 
-- siege를 이용한 부하 적용. Availability가 100% 미만으로 떨어짐. 쿠버네티스가 새로 올려진 서비스를 Ready 상태로 인식하여 서비스 유입을 진행 하였음. Readiness Probe 설정하여 조치 필요.
-![ZeroDownTime  SEIGE_STATUS](https://user-images.githubusercontent.com/54210936/93277995-6109af80-f7fe-11ea-9ebf-5de918c150cc.jpg)
-
-- 새버전 배포 확인(V3 적용)
-![ZeroDownTime  console - pod describe](https://user-images.githubusercontent.com/54210936/93278015-6d8e0800-f7fe-11ea-82d1-dc80b96b601c.jpg)
+- siege를 이용한 부하 적용. Readiness Probe 설정을 통한 ZeroDownTime 구현
+![zerotime deploy - seige](https://user-images.githubusercontent.com/68719144/93343081-09555d80-f86b-11ea-9b62-08d5f83365a2.jpg)
 
 
 - Readiness Probe 설정을 통한 ZeroDownTime 설정.
@@ -345,7 +342,12 @@ metadata:
       initialDelaySeconds: 15      # 서비스 어플 기동 후 15초 뒤 시작
       periodSeconds: 20            # 20초 주기로 readinessProbe 실행 
 ```
-![ZeroDownTime  SEIGE_STATUS_read](https://user-images.githubusercontent.com/54210936/93278989-1473a380-f801-11ea-8140-f7edbc2c9b6f.jpg)
+
+- 새버전 배포 확인(V1 적용)
+![zerotime deploy - describe](https://user-images.githubusercontent.com/68719144/93343091-0c504e00-f86b-11ea-8829-9b934b65b79f.jpg)
+
+
+
 
 
 </br>
@@ -353,30 +355,30 @@ metadata:
 ## 마이크로서비스 로깅 관리를 위한 PVC 설정
 AWS의 EFS에 파일시스템을 생성(EFS-teamc (fs-96929df7))하고 서브넷과 클러스터(TeamC-final)를 연결하고 PVC를 설정해준다. 각 마이크로 서비스의 로그파일이 EFS에 정상적으로 생성되고 기록됨을 확인 함.
 ```
-#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-cna-order/blob/master/buildspec.yml)
+#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-js-order/buildspec.yml)
 volumeMounts:  
-- mountPath: "/mnt/aws"    # ORDER서비스 로그파일 생성 경로
+- mountPath: "/mnt/aws"    # POINT서비스 로그파일 생성 경로 fs-27564906
   name: volume                 
-volumes:                                # 로그 파일 생성을 위한 EFS, PVC 설정 정보
+volumes:                                # 로그 파일 생성을 위한 EFS, PVC 설정 정보  
 - name: volume
   persistentVolumeClaim:
   claimName: aws-efs  
 ```
-![PVC  console - log file test](https://user-images.githubusercontent.com/54210936/93280070-bc8a6c00-f803-11ea-8c0e-ab82c729dfd6.jpg)
+![logs](https://user-images.githubusercontent.com/68719144/93344365-90ef9c00-f86c-11ea-9f01-1d7fbe1c0184.jpg)
+
 
 </br>
 
 ## SelfHealing
 운영 안정성의 확보를 위해 마이크로서비스가 아웃된 뒤에 다시 프로세스가 올라오는 환경을 구축한다. 프로세스가 죽었을 때 다시 기동됨을 확인함.
 ```
-#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-cna-order/blob/master/buildspec.yml)
+#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
 livenessProbe:
   tcpSocket:
   port: 8080
   initialDelaySeconds: 20     # 서비스 어플 기동 후 20초 뒤 시작
   periodSeconds: 3            # 3초 주기로 livenesProbe 실행 
 ```
-![Self-healing  console test](https://user-images.githubusercontent.com/54210936/93280338-5b16cd00-f804-11ea-9687-2d9f8cac9ff1.jpg)
 
 </br>
 </br>
@@ -385,19 +387,20 @@ livenessProbe:
 
 # 첨부
 팀프로젝트 구성을 위해 사용한 계정 정보 및 클러스터 명, Github 주소 등의 내용 공유 
-* AWS 계정 명 : TeamC
+* AWS 계정 명 : admin15
 ```
-Region : ap-northeast2
-EFS : EFS-teamc (fs-96929df7)
-EKS : TeamC-final
-ECR : order / delivery / cook / mypage / gateway
-Codebuild : order / delivery / cook / mypage / gateway
+Region : ap-northeast1
+EFS : EFS-teamc (fs-27564906)
+EKS : ADMIN15
+ECR : admin15-order / admin15-delivery / admin15-cook / admin15-mypage / admin15-gateway / admin15-point
+Codebuild : admin15-order / admin15-delivery / admin15-cook / admin15-mypage / admin15-gateway / admin15-point
 ```
 * Github :</br>
 ```
-https://github.com/dew0327/final-cna-gateway
-https://github.com/dew0327/final-cna-order
-https://github.com/dew0327/final-cna-delivery
-https://github.com/dew0327/final-cna-cook
-https://github.com/dew0327/final-cna-mypage
+https://github.com/dew0327/final-js-gateway
+https://github.com/dew0327/final-js-order
+https://github.com/dew0327/final-js-delivery
+https://github.com/dew0327/final-js-cook
+https://github.com/dew0327/final-js-mypage
+https://github.com/dew0327/final-js-point
 ```
