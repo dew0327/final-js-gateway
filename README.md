@@ -372,13 +372,21 @@ volumes:                                # 로그 파일 생성을 위한 EFS, PV
 ## SelfHealing
 운영 안정성의 확보를 위해 마이크로서비스가 아웃된 뒤에 다시 프로세스가 올라오는 환경을 구축한다. 프로세스가 죽었을 때 다시 기동됨을 확인함.
 ```
-#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
-livenessProbe:
-  tcpSocket:
-  port: 8080
-  initialDelaySeconds: 20     # 서비스 어플 기동 후 20초 뒤 시작
-  periodSeconds: 3            # 3초 주기로 livenesProbe 실행 
+#AWS의 각 codebuild에 설정(https://github.com/dew0327/final-js-cook/buildspec.yml)
+                    livenessProbe:
+                      exec:
+                        command:
+                        - cat
+                        - /mnt/aws/logs/cook-application.log
+                      initialDelaySeconds: 20
+                      periodSeconds: 3
 ```
+기동 로그 파일 삭제   
+![liveness-log-delete](https://user-images.githubusercontent.com/68719144/93350668-d9f71e80-f873-11ea-8497-6cdf167d85d3.jpg)  
+
+
+프로세스 재기동 확인
+![liveness-restart](https://user-images.githubusercontent.com/68719144/93350643-d4013d80-f873-11ea-8420-1c1e22872b61.jpg)
 
 </br>
 </br>
