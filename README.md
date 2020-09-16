@@ -11,7 +11,7 @@
   - [분석/설계](#분석설계)
   - [구현:](#구현)
     - [DDD 의 적용](#ddd-의-적용)
-    - [동기식 호출 과 Fallback 처리](#동기식-호출과-Fallback-처리)
+    - [동기식 호출](#동기식-호출)
     - [비동기식 호출과 Saga Pattern](#비동기식-호출과-Saga-Pattern)
     - [Gateway](#Gateway)
     - [CQRS](#CQRS)
