@@ -272,21 +272,21 @@ server:
 ## 서킷 브레이킹과 오토스케일
 
 * 서킷 브레이킹 :
-주문이 과도할 경우 CB 를 통하여 장애격리. 500 에러가 5번 발생하면 10분간 CB 처리하여 100% 접속 차단
+주문이 과도할 경우 CB 를 통하여 장애격리. 500 에러가 1번 발생하면 10분간 CB 처리하여 100% 접속 차단
 ```
 # AWS codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
  http:
    http1MaxPendingRequests: 1   # 연결을 기다리는 request 수를 1개로 제한 (Default 
    maxRequestsPerConnection: 1  # keep alive 기능 disable
  outlierDetection:
-  consecutiveErrors: 1          # 5xx 에러가 5번 발생하면
+  consecutiveErrors: 1          # 5xx 에러가 1번 발생하면
   interval: 1s                  # 1초마다 스캔 하여
   baseEjectionTime: 10m         # 10분 동안 circuit breaking 처리   
   maxEjectionPercent: 100       # 100% 로 차단
 ```
 
 * 오토스케일(HPA) :
-CPU사용률 10% 초과 시 replica를 5개까지 확장해준다. 상용에서는 70%로 세팅하지만 여기에서는 기능적용 확인을 위해 수치를 조절.
+CPU사용률 10% 초과 시 replica를 3개까지 확장해준다. 상용에서는 70%로 세팅하지만 여기에서는 기능적용 확인을 위해 수치를 조절.
 ```
 apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
@@ -315,7 +315,7 @@ metadata:
   
 
 ```
-# AWS codebuild에 설정(https://github.com/dew0327/final-cna-point/blob/master/buildspec.yml)
+# AWS codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
   spec:
     replicas: 2
     minReadySeconds: 10   # 최소 대기 시간 10초
@@ -353,7 +353,7 @@ kubectl set image deployment/point -n teamc point=271153858532.dkr.ecr.ap-northe
 </br>
 
 ## 마이크로서비스 로깅 관리를 위한 PVC 설정
-AWS의 EFS에 파일시스템을 생성(EFS-teamc (fs-96929df7))하고 서브넷과 클러스터(TeamC-final)를 연결하고 PVC를 설정해준다. 각 마이크로 서비스의 로그파일이 EFS에 정상적으로 생성되고 기록됨을 확인 함.
+AWS의 EFS에 파일시스템을 생성(admin15-efs (fs-96929df7))하고 서브넷과 클러스터(admin15-cluster)를 연결하고 PVC를 설정해준다. 각 마이크로 서비스의 로그파일이 EFS에 정상적으로 생성되고 기록됨을 확인 함.
 ```
 #AWS의 각 codebuild에 설정(https://github.com/dew0327/final-js-order/buildspec.yml)
 volumeMounts:  
@@ -398,8 +398,8 @@ volumes:                                # 로그 파일 생성을 위한 EFS, PV
 * AWS 계정 명 : admin15
 ```
 Region : ap-northeast1
-EFS : EFS-teamc (fs-27564906)
-EKS : ADMIN15
+EFS : admin15-efs (fs-27564906)
+EKS : admin15-cluster
 ECR : admin15-order / admin15-delivery / admin15-cook / admin15-mypage / admin15-gateway / admin15-point
 Codebuild : admin15-order / admin15-delivery / admin15-cook / admin15-mypage / admin15-gateway / admin15-point
 ```
