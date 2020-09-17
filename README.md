@@ -272,7 +272,7 @@ server:
 ## 서킷 브레이킹과 오토스케일
 
 * 서킷 브레이킹 :
-주문이 과도할 경우 CB 를 통하여 장애격리. 500 에러가 1번 발생하면 10분간 CB 처리하여 100% 접속 차단
+주문이 과도하여 포인트 적립에 부하가 발생할 경우 CB 를 통하여 장애격리. 500 에러가 1번 발생하면 1분간 CB 처리하여 30% 접속 차단
 ```
 # AWS codebuild에 설정(https://github.com/dew0327/final-js-point/buildspec.yml)
  http:
@@ -281,12 +281,12 @@ server:
  outlierDetection:
   consecutiveErrors: 1          # 5xx 에러가 1번 발생하면
   interval: 1s                  # 1초마다 스캔 하여
-  baseEjectionTime: 10m         # 10분 동안 circuit breaking 처리   
-  maxEjectionPercent: 100       # 100% 로 차단
+  baseEjectionTime: 1m         # 1분 동안 circuit breaking 처리   
+  maxEjectionPercent: 30       # 30% 로 차단
 ```
 
 * 오토스케일(HPA) :
-CPU사용률 10% 초과 시 replica를 3개까지 확장해준다. 상용에서는 70%로 세팅하지만 여기에서는 기능적용 확인을 위해 수치를 조절.
+CPU사용률 50% 초과 시 replica를 3개까지 확장해준다. 
 ```
 apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
@@ -300,7 +300,7 @@ metadata:
     name: $_PROJECT_NAME                # point (주문) 서비스 HPA 설정
     minReplicas: 1                      # 최소 1개
     maxReplicas: 3                      # 최대 3개
-    targetCPUUtilizationPercentage: 10  # cpu사용율 10프로 초과 시 
+    targetCPUUtilizationPercentage: 50  # cpu사용율 50프로 초과 시 
 ```    
 * 부하테스트(Siege)를 활용한 부하 적용 후 서킷브레이킹 / 오토스케일 내역을 확인한다.
 ![HPA, Circuit Breaker  SEIGE_STATUS](https://user-images.githubusercontent.com/68719144/93344893-2c810c80-f86d-11ea-9c42-9672aebe8eb2.jpg)
@@ -385,7 +385,7 @@ volumes:                                # 로그 파일 생성을 위한 EFS, PV
 ![liveness-log-delete](https://user-images.githubusercontent.com/68719144/93350668-d9f71e80-f873-11ea-8497-6cdf167d85d3.jpg)  
 
 
-프로세스 재기동 확인
+프로세스 재기동 확인  
 ![liveness-restart](https://user-images.githubusercontent.com/68719144/93350643-d4013d80-f873-11ea-8420-1c1e22872b61.jpg)
 
 </br>
