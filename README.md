@@ -247,6 +247,55 @@ server:
 기존 코드에 영향도 없이 mypage 용 materialized view 구성한다. 고객은 주문 접수, 요리 상태, 포인트 적립현황, 배송현황 등을 한개의 페이지에서 확인 할 수 있게 됨.</br>
 ![mypage-sample](https://user-images.githubusercontent.com/68719144/93342738-a663c680-f86a-11ea-8a73-c5239d3cc303.jpg)
 
+```
+@StreamListener(KafkaProcessor.INPUT)
+    public void whenPointSended_then_UPDATE_6(@Payload PointSended pointSended) {
+      try {
+
+            if (pointSended.isMe()) {
+                // view 객체 조회
+                Thread.sleep(1000);
+                List<Mypage> mypageList = mypageRepository.findByOrderId(pointSended.getOrderId());
+                System.out.println("################" + pointSended.getId());
+                System.out.println("################" + pointSended.getStatus());
+                System.out.println("################" + pointSended.getPointKind());
+                for(Mypage mypage : mypageList){
+                    // view 객체에 이벤트의 eventDirectValue 를 set 함
+                    mypage.setPointId(pointSended.getId());
+                    mypage.setPointStatus(pointSended.getStatus());
+                    mypage.setPointSendDate(pointSended.getSendDate());
+                    mypage.setPointKind(pointSended.getPointKind());
+                    // view 레파지 토리에 save
+                    mypageRepository.save(mypage);
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+    @StreamListener(KafkaProcessor.INPUT)
+    public void whenPointSendCancelled_then_UPDATE_7(@Payload PointSendCancelled pointSendCancelled) {
+        try {
+            if (pointSendCancelled.isMe()) {
+                // view 객체 조회
+                List<Mypage> mypageList = mypageRepository.findByOrderId(pointSendCancelled.getOrderId());
+                for(Mypage mypage : mypageList){
+                    // view 객체에 이벤트의 eventDirectValue 를 set 함
+                    mypage.setPointId(pointSendCancelled.getId());
+                    mypage.setPointStatus(pointSendCancelled.getStatus());
+                    mypage.setPointSendDate(pointSendCancelled.getSendDate());
+                    mypage.setPointKind(pointSendCancelled.getPointKind());
+                    // view 레파지 토리에 save
+                    mypageRepository.save(mypage);
+                }
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+```
+
 
 </br>
 </br>
